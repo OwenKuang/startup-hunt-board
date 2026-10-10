@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Startup Job Board</title>
+<style>
+:root {
+  --bg: #f6f6f3;
+  --panel: #ffffff;
+  --panel-2: #fafaf8;
+  --ink: #1d1d1b;
+  --ink-2: #55554f;
+  --ink-3: #8a8a82;
+  --line: #e4e3dd;
+  --line-2: #efeee9;
+  --accent: #2f5fd0;
+  --accent-ink: #ffffff;
+  --accent-soft: #e8eefc;
+  --ok: #1f7a4d;
+  --ok-soft: #e3f3ea;
+  --warn: #8a5a00;
+  --warn-soft: #fff3d6;
+  --spec: #6b3fb5;
+  --spec-soft: #efe8fb;
+  --rep: #5c5c56;
+  --rep-soft: #ecebe6;
+  --agri: #3f7a1f;
+  --agri-soft: #e7f3dc;
+  --shadow: 0 1px 2px rgba(20, 20, 10, .05), 0 4px 16px rgba(20, 20, 10, .04);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141413;
+    --panel: #1c1c1a;
+    --panel-2: #222220;
+    --ink: #ecebe6;
+    --ink-2: #b5b4ac;
+    --ink-3: #85847c;
+    --line: #2f2f2c;
+    --line-2: #282826;
+    --accent: #7ea2ff;
+    --accent-ink: #0d1530;
+    --accent-soft: #1f2a48;
+    --ok: #6fd39f;
+    --ok-soft: #173326;
+    --warn: #f0c066;
+    --warn-soft: #3a2d10;
+    --spec: #c4a6ff;
+    --spec-soft: #2c2142;
+    --rep: #c2c1b9;
+    --rep-soft: #2c2c29;
+    --agri: #9bd77a;
+    --agri-soft: #1f3317;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3);
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { font: inherit; color: inherit; }
+
+/* top bar */
+.top {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.top-inner {
+  max-width: 1500px; margin: 0 auto; padding: 12px 20px;
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+}
+.brand { display: flex; flex-direction: column; margin-right: auto; min-width: 200px; }
+.brand h1 { font-size: 17px; margin: 0; letter-spacing: -.01em; }
+.brand .sub { color: var(--ink-3); font-size: 12px; }
+.search {
+  width: 260px; max-width: 100%;
+  padding: 7px 11px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+}
+.search:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+.toggle { display: inline-flex; gap: 6px; align-items: center; color: var(--ink-2); font-size: 13px; cursor: pointer; user-select: none; }
+.btn {
+  border: 1px solid var(--line); background: var(--panel);
+  padding: 6px 11px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  display: inline-flex; gap: 6px; align-items: center; white-space: nowrap;
+}
+.btn:hover { border-color: var(--ink-3); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.small { padding: 3px 9px; font-size: 12px; border-radius: 6px; }
+.btn.copied { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+
+main { max-width: 1500px; margin: 0 auto; padding: 16px 20px 80px; }
+.empty { color: var(--ink-3); padding: 40px 0; text-align: center; }
+.err { background: var(--warn-soft); color: var(--warn); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; }
+
+/* day groups */
+.day { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 16px; box-shadow: var(--shadow); overflow: clip; }
+.day-head {
+  width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; background: none; border: 0; cursor: pointer; text-align: left;
+}
+.day-head:hover { background: var(--panel-2); }
+.day-head .chev { transition: transform .15s; color: var(--ink-3); }
+.day.collapsed .day-head .chev { transform: rotate(-90deg); }
+.day-head h2 { font-size: 15px; margin: 0; }
+.day-head .meta { color: var(--ink-3); font-size: 12.5px; }
+.day-head .spacer { flex: 1; }
+.day.collapsed .day-body { display: none; }
+.day-notes { border-top: 1px solid var(--line-2); padding: 0 16px; }
+.day-notes summary { cursor: pointer; color: var(--ink-2); font-size: 13px; padding: 9px 0; }
+.day-notes .md { padding: 0 0 12px; color: var(--ink-2); font-size: 13px; max-width: 980px; }
+.md h4 { margin: 12px 0 4px; font-size: 13px; color: var(--ink); }
+.md p { margin: 6px 0; }
+.md ul, .md ol { margin: 4px 0; padding-left: 20px; }
+
+/* table grid */
+.grid-head, .row {
+  display: grid;
+  grid-template-columns: 34px minmax(150px, 1.05fr) minmax(170px, 1.25fr) minmax(140px, .95fr) minmax(300px, 2.6fr) 96px 40px;
+  gap: 14px; align-items: start; padding: 11px 16px;
+}
+.grid-head {
+  border-top: 1px solid var(--line-2); border-bottom: 1px solid var(--line);
+  color: var(--ink-3); font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; padding-top: 8px; padding-bottom: 8px;
+  background: var(--panel-2);
+}
+.row { border-bottom: 1px solid var(--line-2); }
+.row:last-child { border-bottom: 0; }
+.entry.applied .row { background: color-mix(in srgb, var(--ok-soft) 45%, transparent); }
+.entry.skipped .row > :not(.status-cell) { opacity: .45; }
+.entry.skipped .company a, .entry.skipped .company strong { text-decoration: line-through; }
+.entry.open .row { background: var(--panel-2); }
+.num { color: var(--ink-3); font-variant-numeric: tabular-nums; padding-top: 1px; }
+.company a { font-weight: 600; color: var(--ink); }
+.company a:hover { color: var(--accent); }
+.small { font-size: 12px; color: var(--ink-3); }
+.loc { font-size: 12.5px; color: var(--ink-2); }
+.role a { font-weight: 500; }
+.badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.badge { font-size: 10.5px; font-weight: 600; letter-spacing: .02em; padding: 1px 7px; border-radius: 99px; background: var(--rep-soft); color: var(--rep); white-space: nowrap; }
+.badge.NEW { background: var(--accent-soft); color: var(--accent); }
+.badge.SPECULATIVE { background: var(--spec-soft); color: var(--spec); }
+.badge.REPEAT { background: var(--rep-soft); color: var(--rep); }
+.badge.agri { background: var(--agri-soft); color: var(--agri); }
+.badge.fit-strong { background: var(--ok-soft); color: var(--ok); }
+.badge.fit-good { background: var(--accent-soft); color: var(--accent); }
+.badge.fit-mid { background: var(--warn-soft); color: var(--warn); }
+.badge.applied { background: var(--ok); color: var(--panel); }
+.contact a { font-weight: 500; }
+.contact .title { font-size: 12px; color: var(--ink-3); }
+.note-text { font-size: 13px; color: var(--ink); white-space: pre-wrap; }
+.note-foot { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.count { font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.count.over { color: #c0392b; font-weight: 700; }
+.status-cell { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.applied-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 11px; line-height: 1.2; text-align: center; color: var(--ink-3); cursor: pointer; user-select: none; }
+.applied-cell input { width: 18px; height: 18px; accent-color: var(--ok); cursor: pointer; margin: 2px 0 0; }
+.applied-cell.skip input { accent-color: var(--ink-3); }
+.expand {
+  width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel);
+  cursor: pointer; display: grid; place-items: center; color: var(--ink-2);
+}
+.expand:hover { border-color: var(--ink-3); color: var(--ink); }
+.expand svg { transition: transform .15s; }
+.entry.open .expand svg { transform: rotate(180deg); }
+.entry.open .expand { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+/* detail panel */
+.detail { display: none; border-bottom: 1px solid var(--line); background: var(--panel-2); padding: 4px 16px 18px 64px; }
+.entry.open .detail { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(360px, 1.6fr); gap: 22px; }
+.sec { margin-top: 12px; }
+.sec h5 { margin: 0 0 4px; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); }
+.sec .body { font-size: 13px; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.sec.heads .body { background: var(--warn-soft); color: var(--warn); padding: 8px 10px; border-radius: 8px; white-space: normal; }
+.copybox { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 10px 12px; margin-top: 6px; }
+.copybox .q { font-weight: 600; font-size: 13px; color: var(--ink); }
+.copybox .qmeta { font-size: 12px; color: var(--ink-3); }
+.copybox .a { font-size: 13px; color: var(--ink); white-space: pre-wrap; margin-top: 4px; overflow-wrap: anywhere; }
+.copybox .bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.fields { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; margin-top: 6px; }
+.field-row { display: grid; grid-template-columns: minmax(120px, 34%) 1fr auto; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--line-2); align-items: center; font-size: 12.5px; }
+.field-row:last-child { border-bottom: 0; }
+.field-row .k { color: var(--ink-3); }
+.field-row .v { color: var(--ink); overflow-wrap: anywhere; }
+mark.fill { background: var(--warn-soft); color: var(--warn); border-radius: 4px; padding: 0 3px; font-weight: 600; }
+.answers-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.hidden { display: none !important; }
+/* password lock (hosted copy only) */
+.lock { max-width: 400px; margin: 12vh auto; padding: 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.lock h2 { margin: 0 0 6px; font-size: 18px; }
+.lock p { margin: 0 0 14px; color: var(--ink-3); font-size: 13px; }
+.lock input[type=password] { width: 100%; box-sizing: border-box; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); font: inherit; }
+.lock .lock-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 12px; font-size: 12.5px; color: var(--ink-3); }
+.lock .bad { color: #c0392b; font-size: 12.5px; margin-top: 10px; min-height: 1.2em; }
+
+@media (max-width: 1000px) {
+  .grid-head { display: none; }
+  .row { grid-template-columns: 1fr auto auto; grid-template-areas: "company applied expand" "role role role" "contact contact contact" "note note note"; gap: 8px; }
+  .row .num { display: none; }
+  .row .company { grid-area: company; }
+  .row .role { grid-area: role; }
+  .row .contact { grid-area: contact; }
+  .row .note { grid-area: note; }
+  .row .status-cell { grid-area: applied; flex-direction: row; gap: 12px; }
+  .row .expand { grid-area: expand; }
+  .entry.open .detail { grid-template-columns: 1fr; padding-left: 16px; }
+  .search { width: 100%; }
+}
+</style>
+<meta name="robots" content="noindex, nofollow">
+<script>window.BOARD_STATIC = true;</script>
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <h1>Startup job board</h1>
+      <span class="sub" id="sub">Loading…</span>
+    </div>
+    <input id="q" class="search" type="search" placeholder="Search company, role, city, founder" autocomplete="off">
+    <label class="toggle"><input type="checkbox" id="hideApplied"> Hide applied</label>
+    <label class="toggle"><input type="checkbox" id="hideSkip"> Hide not interested</label>
+    <button class="btn" id="collapseAll" type="button">Collapse all</button>
+    <button class="btn hidden" id="lockBtn" type="button" title="Forget the password on this device">Lock</button>
+    <button class="btn primary" id="refresh" type="button" title="Reload the daily files and tracker">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+      Refresh
+    </button>
+  </div>
+</header>
+<main id="main"><div class="empty">Loading…</div></main>
+
+<script>
+(() => {
+  const $ = (s, el = document) => el.querySelector(s);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  };
+  let DATA = null;
+  let lastFetch = 0;
+  // Hosted copy (GitHub Pages): data.enc.json is decrypted here with the board password; ticks save in this browser.
+  const STATIC = !!window.BOARD_STATIC;
+  let PASSWORD = null;
+  const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+  async function decryptBoard(pw) {
+    const r = await fetch("data.enc.json", { cache: "no-store" });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const enc = await r.json();
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+    const key = await crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt: b64(enc.salt), iterations: enc.iter },
+      base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+    let plain;
+    try { plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(enc.iv) }, key, b64(enc.ct)); }
+    catch { const e = new Error("wrong password"); e.wrongPassword = true; throw e; }
+    const text = await new Response(new Blob([plain]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
+    return JSON.parse(text);
+  }
+  function applyLocalTicks(data) {
+    const ticks = store.get("jb.ticks", {});
+    for (const d of data.days) for (const e of d.entries) if (Object.prototype.hasOwnProperty.call(ticks, e.key)) e.trackerStatus = ticks[e.key];
+    return data;
+  }
+  function forgetPassword() { PASSWORD = null; try { localStorage.removeItem("jb.pw"); } catch {} }
+  function showLock(msg) {
+    $("#main").innerHTML = `<form class="lock" id="lock">
+      <h2>Startup job board</h2>
+      <p>This copy is encrypted. Enter the board password to unlock it.</p>
+      <input type="password" id="pw" autocomplete="current-password" placeholder="Board password" required>
+      <div class="lock-row"><label><input type="checkbox" id="remember"> Remember on this device</label>
+        <button class="btn primary" type="submit">Unlock</button></div>
+      <div class="bad">${esc(msg || "")}</div>
+    </form>`;
+    $("#sub").textContent = "Locked";
+    $("#pw").focus();
+    $("#lock").addEventListener("submit", async ev => {
+      ev.preventDefault();
+      const pw = $("#pw").value, remember = $("#remember").checked;
+      $("#lock .bad").textContent = "Unlocking…";
+      try {
+        DATA = applyLocalTicks(await decryptBoard(pw));
+        PASSWORD = pw;
+        if (remember) store.set("jb.pw", pw);
+        lastFetch = Date.now();
+        render();
+      } catch (err) {
+        $("#lock .bad").textContent = err.wrongPassword ? "Wrong password." : `Couldn't load the board (${err.message}).`;
+      }
+    });
+  }
+  const open = new Set();
+  let collapsed = store.get("jb.collapsed", {});
+
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  function rich(s) {
+    let h = esc(s);
+    h = h.replace(/\[OWEN TO FILL:[^\]]*\]/g, m => `<mark class="fill">${m}</mark>`);
+    h = h.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    h = h.replace(/(^|[\s(])(https?:\/\/[^\s<)]+[^\s<).,;])/g, (m, p, u) => `${p}<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
+    return h;
+  }
+  function md(text) {
+    const lines = String(text || "").split("\n");
+    let out = "", list = null;
+    const close = () => { if (list) { out += `</${list}>`; list = null; } };
+    for (const raw of lines) {
+      const l = raw.trim();
+      if (!l) { close(); continue; }
+      if (/^#{2,4}\s/.test(l)) { close(); out += `<h4>${rich(l.replace(/^#+\s/, ""))}</h4>`; continue; }
+      const ul = l.match(/^[-*]\s+(.*)/), ol = l.match(/^\d+\.\s+(.*)/);
+      if (ul || ol) {
+        const t = ul ? "ul" : "ol";
+        if (list !== t) { close(); out += `<${t}>`; list = t; }
+        out += `<li>${rich((ul || ol)[1])}</li>`; continue;
+      }
+      if (/^---+$/.test(l)) { close(); continue; }
+      close(); out += `<p>${rich(l)}</p>`;
+    }
+    close();
+    return out;
+  }
+  const short = s => String(s || "").replace(/\s*\([^)]*\)/g, "").trim();
+
+  async function copyText(text, btn) {
+    try { await navigator.clipboard.writeText(text); }
+    catch {
+      const ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); } catch {}
+      ta.remove();
+    }
+    if (btn) {
+      const old = btn.textContent;
+      btn.classList.add("copied"); btn.textContent = "Copied";
+      setTimeout(() => { btn.classList.remove("copied"); btn.textContent = old; }, 1200);
+    }
+  }
+
+  function roleParts(role) {
+    let r = role || "", pitch = "";
+    const m = r.match(/\(pitched as an? Winter 2027 (co-op|internship)\)/i);
+    if (m) { pitch = m[1].toLowerCase() === "co-op" ? "Co-op pitch" : "Internship pitch"; r = r.replace(m[0], ""); }
+    r = r.replace(/\(speculative[^)]*\)/i, "");
+    return { title: r.trim().replace(/\s+/g, " "), pitch };
+  }
+
+  function entryHTML(day, e) {
+    const id = `${day.id}#${e.n}`;
+    const applied = e.trackerStatus === "applied";
+    const skipped = e.trackerStatus === "skip";
+    const rp = roleParts(e.role);
+    const fit = (e.fit || "").toLowerCase();
+    const searchUrl = /linkedin\.com\/search/.test(e.dmUrl);
+    const badges = [
+      e.status ? `<span class="badge ${esc(e.status)}">${esc(e.status === "SPECULATIVE" ? "Speculative" : e.status === "REPEAT" ? "Repeat" : "New")}</span>` : "",
+      fit ? `<span class="badge fit-${esc(fit)}">${esc(e.fit)} fit</span>` : "",
+      e.track ? `<span class="badge">Track ${esc(e.track)}</span>` : "",
+      e.agritech ? `<span class="badge agri">Agritech</span>` : "",
+      rp.pitch ? `<span class="badge">${esc(rp.pitch)}</span>` : "",
+      e.trackerStatus && !applied && !skipped ? `<span class="badge">${esc(e.trackerStatus)}</span>` : "",
+    ].join("");
+    const note = e.note || "";
+    const sizeShort = short(e.size);
+    return `
+<div class="entry${applied ? " applied" : ""}${skipped ? " skipped" : ""}${open.has(id) ? " open" : ""}" data-id="${esc(id)}" data-key="${esc(e.key)}"
+     data-search="${esc([e.company, e.role, e.city, e.dmName, e.dmTitle].join(" ").toLowerCase())}">
+  <div class="row">
+    <div class="num">${e.n}</div>
+    <div class="company">
+      ${e.website ? `<a href="${esc(e.website)}" target="_blank" rel="noopener" title="${esc(e.website)}">${esc(e.company)}</a>` : `<strong>${esc(e.company)}</strong>`}
+      <div class="loc">${esc(e.city || "Location not listed")}</div>
+      ${sizeShort ? `<div class="small" title="${esc(e.size)}">${esc(sizeShort)} people</div>` : ""}
+    </div>
+    <div class="role">
+      ${e.link ? `<a href="${esc(e.link)}" target="_blank" rel="noopener" title="Open posting">${esc(rp.title || "Open link")}</a>` : esc(rp.title)}
+      <div class="badges">${badges}</div>
+    </div>
+    <div class="contact">
+      ${e.dmUrl ? `<a href="${esc(e.dmUrl)}" target="_blank" rel="noopener">${esc(e.dmName || "LinkedIn")}</a>` : esc(e.dmName)}
+      <div class="title" title="${esc(e.dmTitle)}">${esc(short(e.dmTitle))}</div>
+      <div class="small">${searchUrl ? "LinkedIn search (profile not confirmed)" : "LinkedIn profile"}</div>
+    </div>
+    <div class="note">
+      <div class="note-text">${note ? esc(note) : `<span class="small">No connection note in this file.</span>`}</div>
+      ${note ? `<div class="note-foot">
+        <button class="btn small" data-copy="note" type="button">Copy note</button>
+        <span class="count${e.noteLen > 300 ? " over" : ""}">${e.noteLen}/300</span>
+      </div>` : ""}
+    </div>
+    <div class="status-cell">
+      <label class="applied-cell" title="Marks status = applied in tracker.csv">
+        <input type="checkbox" data-status="applied" ${applied ? "checked" : ""}>
+        Applied
+      </label>
+      <label class="applied-cell skip" title="Marks status = skip in tracker.csv; future runs won't list this company again">
+        <input type="checkbox" data-status="skip" ${skipped ? "checked" : ""}>
+        Not interested
+      </label>
+    </div>
+    <button class="expand" type="button" aria-label="Show DM and application answers" title="DM and application answers">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+  </div>
+  <div class="detail"></div>
+</div>`;
+  }
+
+  function copyBox(label, text, meta) {
+    return `<div class="copybox">
+      <div class="bar"><div><div class="q">${esc(label)}</div>${meta ? `<div class="qmeta">${esc(meta)}</div>` : ""}</div>
+      <button class="btn small" data-copytext="${esc(text)}" type="button">Copy</button></div>
+      <div class="a">${rich(text)}</div>
+    </div>`;
+  }
+
+  function detailHTML(day, e) {
+    const sec = (title, body, cls = "") => body ? `<div class="sec ${cls}"><h5>${esc(title)}</h5><div class="body">${rich(body)}</div></div>` : "";
+    const left = [
+      sec("Posting / link", e.linkLine),
+      sec("First listed", e.firstListed),
+      sec("What they do", e.what),
+      sec("Why Owen fits", e.why),
+      sec("Angle", e.angle),
+      sec("Detail referenced", e.detail),
+      sec("Heads up", e.heads, "heads"),
+      sec("Size", e.size),
+    ].join("");
+    const fields = e.answers.filter(a => a.kind === "field");
+    const qs = e.answers.filter(a => a.kind !== "field");
+    let right = "";
+    if (e.dm) right += `<div class="sec"><h5>DM after they accept</h5>${copyBox("DM", e.dm)}</div>`;
+    if (e.nudge) right += `<div class="sec"><h5>Follow-up nudge</h5>${copyBox("Nudge DM", e.nudge)}</div>`;
+    right += `<div class="sec"><div class="answers-title"><h5>Application answers</h5>
+      ${qs.length ? `<button class="btn small" data-copyall type="button">Copy all answers</button>` : ""}</div>`;
+    if (e.formInfo) right += `<div class="body small" style="margin-bottom:4px">${rich(e.formInfo)}</div>`;
+    if (fields.length) {
+      right += `<div class="fields">${fields.map(f => `<div class="field-row"><div class="k">${esc(f.q)}</div><div class="v">${rich(f.a)}</div>
+        <button class="btn small" data-copytext="${esc(f.a)}" type="button">Copy</button></div>`).join("")}</div>`;
+    }
+    right += qs.map(a => copyBox(a.q, a.a, a.meta)).join("");
+    if (!fields.length && !qs.length) {
+      right += `<div class="body small">${e.status === "REPEAT"
+        ? "Repeat entry: the full application answers are in the earlier day's pack (see First listed)."
+        : "No application answers were drafted in this file (the Oct 7 batch only had notes and DMs)."}</div>`;
+    }
+    right += `</div>`;
+    return `<div>${left}</div><div>${right}</div>`;
+  }
+
+  function render() {
+    const main = $("#main");
+    if (!DATA || !DATA.days.length) { main.innerHTML = `<div class="empty">No daily files found in startup-hunt/daily yet.</div>`; return; }
+    updateSub();
+    main.innerHTML = DATA.days.map(d => {
+      const nApplied = d.entries.filter(e => e.trackerStatus === "applied").length;
+      const nSkip = d.entries.filter(e => e.trackerStatus === "skip").length;
+      const isCollapsed = collapsed[d.id] ?? false;
+      const notes = (d.intro || d.footer) ? `<details class="day-notes"><summary>Day notes: summary, top picks, and fill-in items</summary><div class="md">${md(d.intro)}${md(d.footer)}</div></details>` : "";
+      return `<section class="day${isCollapsed ? " collapsed" : ""}" data-day="${esc(d.id)}">
+        <button class="day-head" type="button">
+          <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          <h2>${esc(d.label)}</h2>
+          <span class="meta">${d.entries.length} roles · <span data-day-applied>${nApplied}</span> applied · <span data-day-skip>${nSkip}</span> not interested · ${esc(d.file)}</span>
+          <span class="spacer"></span>
+        </button>
+        <div class="day-body">
+          ${notes}
+          <div class="grid-head"><div>#</div><div>Company</div><div>Job</div><div>Contact</div><div>Connection note (max 300)</div><div>Status</div><div></div></div>
+          ${d.entries.map(e => entryHTML(d, e)).join("")}
+        </div>
+      </section>`;
+    }).join("");
+    for (const el of document.querySelectorAll(".entry.open")) fillDetail(el);
+    applyFilter();
+  }
+
+  function updateSub() {
+    let total = 0, applied = 0, skipped = 0;
+    const seen = new Set();
+    for (const d of DATA.days) for (const e of d.entries) {
+      total++;
+      if (!seen.has(e.key)) { seen.add(e.key); if (e.trackerStatus === "applied") applied++; if (e.trackerStatus === "skip") skipped++; }
+    }
+    $("#sub").textContent = `${total} roles across ${DATA.days.length} day${DATA.days.length > 1 ? "s" : ""} · ${applied} companies applied · ${skipped} not interested · refreshed ${new Date(lastFetch || Date.now()).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}${STATIC ? " · hosted copy: ticks save in this browser" : ""}`;
+  }
+
+  function findEntry(el) {
+    const [dayId, n] = el.dataset.id.split("#");
+    const day = DATA.days.find(d => d.id === dayId);
+    return [day, day.entries.find(e => String(e.n) === n)];
+  }
+  function fillDetail(el) {
+    const [day, e] = findEntry(el);
+    el.querySelector(".detail").innerHTML = detailHTML(day, e);
+  }
+
+  function applyFilter() {
+    const q = $("#q").value.trim().toLowerCase();
+    const hide = $("#hideApplied").checked;
+    const hideSkip = $("#hideSkip").checked;
+    for (const sec of document.querySelectorAll(".day")) {
+      let shown = 0;
+      for (const el of sec.querySelectorAll(".entry")) {
+        const ok = (!q || el.dataset.search.includes(q)) && !(hide && el.classList.contains("applied")) && !(hideSkip && el.classList.contains("skipped"));
+        el.classList.toggle("hidden", !ok);
+        if (ok) shown++;
+      }
+      sec.classList.toggle("hidden", shown === 0 && (q || hide || hideSkip));
+    }
+  }
+
+  async function load(manual) {
+    const btn = $("#refresh");
+    if (manual) btn.disabled = true;
+    try {
+      if (STATIC) {
+        const pw = PASSWORD || store.get("jb.pw", null);
+        if (!pw) { showLock(); return; }
+        try { DATA = applyLocalTicks(await decryptBoard(pw)); PASSWORD = pw; }
+        catch (err) { if (err.wrongPassword) { forgetPassword(); showLock("The saved password no longer works."); return; } throw err; }
+      } else {
+        const r = await fetch("/api/data", { cache: "no-store" });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        DATA = await r.json();
+      }
+      lastFetch = Date.now();
+      render();
+    } catch (err) {
+      $("#main").insertAdjacentHTML("afterbegin", `<div class="err">Couldn't load the board data (${esc(err.message)}). ${STATIC ? "Try Refresh." : "Is server.py still running?"}</div>`);
+    } finally { btn.disabled = false; }
+  }
+
+  // Applied and Not interested share tracker.csv's single status column, so ticking one clears the other.
+  async function setStatus(key, company, kind, value) {
+    const els = document.querySelectorAll(`.entry[data-key="${CSS.escape(key)}"]`);
+    const first = DATA.days.flatMap(d => d.entries).find(e => e.key === key);
+    const before = first ? first.trackerStatus || "" : "";
+    const after = value ? kind : (before === kind ? "" : before);
+    const apply = st => {
+      for (const el of els) {
+        el.classList.toggle("applied", st === "applied");
+        el.classList.toggle("skipped", st === "skip");
+        for (const cb of el.querySelectorAll("[data-status]")) cb.checked = cb.dataset.status === st;
+      }
+      for (const d of DATA.days) for (const e of d.entries) if (e.key === key) e.trackerStatus = st;
+      for (const sec of document.querySelectorAll(".day")) {
+        const d = DATA.days.find(x => x.id === sec.dataset.day);
+        if (!d) continue;
+        const a = sec.querySelector("[data-day-applied]"), s = sec.querySelector("[data-day-skip]");
+        if (a) a.textContent = d.entries.filter(e => e.trackerStatus === "applied").length;
+        if (s) s.textContent = d.entries.filter(e => e.trackerStatus === "skip").length;
+      }
+      updateSub();
+    };
+    apply(after);
+    if (STATIC) {
+      const ticks = store.get("jb.ticks", {});
+      ticks[key] = after;
+      store.set("jb.ticks", ticks);
+      applyFilter();
+      return;
+    }
+    try {
+      const r = await fetch("/api/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Job-Board": "1" },
+        body: JSON.stringify({ company, status: kind, on: value }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    } catch (err) {
+      apply(before);
+      alert(`Couldn't save to tracker.csv (${err.message}).`);
+    }
+    applyFilter();
+  }
+
+  document.addEventListener("click", ev => {
+    const t = ev.target;
+    const head = t.closest(".day-head");
+    if (head) {
+      const sec = head.closest(".day");
+      sec.classList.toggle("collapsed");
+      collapsed[sec.dataset.day] = sec.classList.contains("collapsed");
+      store.set("jb.collapsed", collapsed);
+      return;
+    }
+    const exp = t.closest(".expand");
+    if (exp) {
+      const el = exp.closest(".entry");
+      el.classList.toggle("open");
+      if (el.classList.contains("open")) { open.add(el.dataset.id); fillDetail(el); } else open.delete(el.dataset.id);
+      return;
+    }
+    const cn = t.closest("[data-copy='note']");
+    if (cn) { const [, e] = findEntry(cn.closest(".entry")); copyText(e.note, cn); return; }
+    const ct = t.closest("[data-copytext]");
+    if (ct) { copyText(ct.getAttribute("data-copytext"), ct); return; }
+    const ca = t.closest("[data-copyall]");
+    if (ca) {
+      const [, e] = findEntry(ca.closest(".entry"));
+      const txt = e.answers.filter(a => a.kind !== "field").map(a => `${a.q}\n${a.a}`).join("\n\n");
+      copyText(txt, ca); return;
+    }
+  });
+  document.addEventListener("change", ev => {
+    const cb = ev.target.closest("[data-status]");
+    if (cb) {
+      const el = cb.closest(".entry");
+      const [, e] = findEntry(el);
+      setStatus(e.key, e.company, cb.dataset.status, cb.checked);
+    }
+  });
+  $("#q").addEventListener("input", applyFilter);
+  $("#hideApplied").checked = store.get("jb.hideApplied", false);
+  $("#hideApplied").addEventListener("change", () => { store.set("jb.hideApplied", $("#hideApplied").checked); applyFilter(); });
+  $("#hideSkip").checked = store.get("jb.hideSkip", true);
+  $("#hideSkip").addEventListener("change", () => { store.set("jb.hideSkip", $("#hideSkip").checked); applyFilter(); });
+  $("#refresh").addEventListener("click", () => load(true));
+  if (STATIC) {
+    $("#lockBtn").classList.remove("hidden");
+    $("#lockBtn").addEventListener("click", () => { forgetPassword(); DATA = null; showLock(); });
+  }
+  $("#collapseAll").addEventListener("click", () => {
+    const secs = [...document.querySelectorAll(".day")];
+    const allCollapsed = secs.every(s => s.classList.contains("collapsed"));
+    for (const s of secs) { s.classList.toggle("collapsed", !allCollapsed); collapsed[s.dataset.day] = !allCollapsed; }
+    store.set("jb.collapsed", collapsed);
+    $("#collapseAll").textContent = allCollapsed ? "Collapse all" : "Expand all";
+  });
+  // pick up a new day from the 9am run when the tab comes back into view
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && Date.now() - lastFetch > 60000 && (!STATIC || PASSWORD)) load(false);
+  });
+  load(false);
+})();
+</script>
+</body>
+</html>
