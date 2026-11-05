@@ -194,6 +194,26 @@ main { max-width: 1500px; margin: 0 auto; padding: 16px 20px 80px; }
 mark.fill { background: var(--warn-soft); color: var(--warn); border-radius: 4px; padding: 0 3px; font-weight: 600; }
 .answers-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .hidden { display: none !important; }
+/* connection note wording editor */
+.wording-wrap { max-width: 1500px; margin: 0 auto; padding: 16px 20px 0; }
+.wording { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 14px 16px 16px; }
+.w-top { display: flex; align-items: flex-start; gap: 12px; }
+.w-top h2 { font-size: 15px; margin: 0; }
+.w-top p { margin: 2px 0 0; color: var(--ink-2); font-size: 13px; }
+.w-top .btn { margin-left: auto; }
+.w-status { font-size: 12.5px; color: var(--ink-3); margin-top: 4px; min-height: 1.5em; }
+.w-status.bad { color: #c0392b; }
+.w-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 8px; }
+.w-card { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.w-head { display: flex; align-items: center; gap: 8px; }
+.w-head h3 { font-size: 13px; margin: 0; }
+.w-head .btn { margin-left: auto; }
+.w-card textarea { width: 100%; min-height: 150px; resize: vertical; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); color: var(--ink); font: 13px/1.45 inherit; font-family: inherit; }
+.w-card textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+.w-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.w-warn { background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 6px 9px; font-size: 12.5px; }
+.w-sample { background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 10px; font-size: 13px; overflow-wrap: anywhere; }
+.w-sample .small { display: block; margin-bottom: 2px; }
 /* password lock (hosted copy only) */
 .lock { max-width: 400px; margin: 12vh auto; padding: 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
 .lock h2 { margin: 0 0 6px; font-size: 18px; }
@@ -214,6 +234,7 @@ mark.fill { background: var(--warn-soft); color: var(--warn); border-radius: 4px
   .row .expand { grid-area: expand; }
   .entry.open .detail { grid-template-columns: 1fr; padding-left: 16px; }
   .search { width: 100%; }
+  .w-grid { grid-template-columns: 1fr; }
 }
 </style>
 <meta name="robots" content="noindex, nofollow">
@@ -230,6 +251,7 @@ mark.fill { background: var(--warn-soft); color: var(--warn); border-radius: 4px
     <label class="toggle"><input type="checkbox" id="hideApplied"> Hide applied</label>
     <label class="toggle"><input type="checkbox" id="hideSkip"> Hide not interested</label>
     <button class="btn" id="collapseAll" type="button">Collapse all</button>
+    <button class="btn" id="wordingBtn" type="button" aria-expanded="false" aria-controls="wording">Edit note wording</button>
     <button class="btn hidden" id="lockBtn" type="button" title="Forget the password on this device">Lock</button>
     <button class="btn primary" id="refresh" type="button" title="Reload the daily files and tracker">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
@@ -237,6 +259,7 @@ mark.fill { background: var(--warn-soft); color: var(--warn); border-radius: 4px
     </button>
   </div>
 </header>
+<section class="wording-wrap hidden" id="wording" aria-label="Connection note wording"></section>
 <main id="main"><div class="empty">Loading…</div></main>
 
 <script>
@@ -394,7 +417,8 @@ mark.fill { background: var(--warn-soft); color: var(--warn); border-radius: 4px
       <div class="note-text">${note ? esc(note) : `<span class="small">No connection note in this file.</span>`}</div>
       ${note ? `<div class="note-foot">
         <button class="btn small" data-copy="note" type="button">Copy note</button>
-        <span class="count${e.noteLen > 300 ? " over" : ""}">${e.noteLen}/300</span>
+        <span class="count${e.noteLen > NOTE_MAX ? " over" : ""}">${e.noteLen}/${NOTE_MAX}</span>
+        ${e.noteParts ? `<span class="small">${esc(e.noteParts.kind)} wording</span>` : ""}
       </div>` : ""}
     </div>
     <div class="status-cell">
@@ -457,9 +481,156 @@ mark.fill { background: var(--warn-soft); color: var(--warn); border-radius: 4px
     return `<div>${left}</div><div>${right}</div>`;
   }
 
+  // Connection notes are rebuilt here from the wording in the editor, so every row and Copy note button follows it.
+  // Same fitting rules as tools/make_note.py: try each company/product candidate, longest first, until it fits.
+  const NOTE_MAX = 300;
+  const NOTE_KINDS = [["robotics", "Robotics"], ["software", "Software"], ["product", "Product"]];
+  const ARTICLE = /^(your|the|a|an|their|its) /i;
+  const SENTENCE_END = /[.!?]\s+/;
+  let wording = {};   // custom text by kind, plus savedAt; a kind with no text uses DATA.noteDefaults
+  const wordingFor = kind => wording[kind] || DATA.noteDefaults[kind];
+
+  function fillNote(template, parts, cand) {
+    let s = template;
+    if (cand.p === null) s = s.replace(/\s+with \{product\}/g, "");
+    if (cand.v === "are") s = s.replace(/\{product\}(\s+)is\b/g, "{product}$1are");
+    s = s.replace(/\{product\}/g, (m, at, all) => {
+      const before = all.slice(0, at);
+      let p = cand.p ?? cand.c;
+      if (ARTICLE.test(p)) p = p[0].toLowerCase() + p.slice(1);
+      // "what Acme is doing with its robots" but "I love your robots at Acme"
+      p = before.split(SENTENCE_END).pop().includes("{company}") ? p.replace(/^your /, "its ") : p.replace(/^its /, "your ");
+      if (ARTICLE.test(p) && (!before.trim() || /[.!?]\s+$/.test(before))) p = p[0].toUpperCase() + p.slice(1);
+      return p;
+    });
+    return s.replace(/\{company\}/g, () => cand.c).replace(/\{first\}/g, () => parts.first);
+  }
+  function buildNote(parts) {
+    const full = wordingFor(parts.kind);
+    const short = full.replace(/If any of this\b/, "If this");
+    let s = "";
+    for (const cand of parts.cands) {
+      for (const t of short === full ? [full] : [full, short]) {
+        s = fillNote(t, parts, cand);
+        if (s.length <= NOTE_MAX) return s;
+      }
+    }
+    return s;
+  }
+  const noteEntries = () => DATA.days.flatMap(d => d.entries.filter(e => e.noteParts).map(e => [d, e]));
+  function refreshNotes() {
+    for (const [, e] of noteEntries()) { e.note = buildNote(e.noteParts); e.noteLen = e.note.length; }
+  }
+  function updateNoteRows() {
+    const byId = new Map(noteEntries().map(([d, e]) => [`${d.id}#${e.n}`, e]));
+    for (const el of document.querySelectorAll(".entry")) {
+      const e = byId.get(el.dataset.id);
+      if (!e) continue;
+      el.querySelector(".note-text").textContent = e.note;
+      const c = el.querySelector(".count");
+      c.textContent = `${e.noteLen}/${NOTE_MAX}`;
+      c.classList.toggle("over", e.noteLen > NOTE_MAX);
+    }
+  }
+  // Newest save wins: the local board's file (published with the board), this browser's copy, or what's being edited.
+  function syncWording() {
+    const saved = [DATA.noteWording || {}, STATIC ? store.get("jb.noteWording", {}) : {}, wording];
+    wording = saved.reduce((best, w) => ((w.savedAt || 0) > (best.savedAt || 0) ? w : best), wording);
+  }
+
+  function wordingWarnings(kind) {
+    const text = wording[kind] ?? DATA.noteDefaults[kind];
+    const unknown = (text.match(/\{[^}]*\}/g) || []).filter(p => !["{first}", "{product}", "{company}"].includes(p));
+    const out = [];
+    if (unknown.length) out.push(`${[...new Set(unknown)].join(", ")} isn't a placeholder, so it would be copied as typed.`);
+    if (!text.includes("{first}")) out.push("This wording doesn't use their name ({first}).");
+    return out;
+  }
+  function buildWordingPanel() {
+    $("#wording").innerHTML = `<div class="wording">
+      <div class="w-top"><div><h2>Connection note wording</h2>
+        <p>Every note and Copy note button on this board updates as you type. Long product names shorten automatically to fit ${NOTE_MAX} characters.</p></div>
+        <button class="btn small" id="wordingClose" type="button">Close</button></div>
+      <div class="w-status" id="wStatus" role="status"></div>
+      <div class="w-grid">${NOTE_KINDS.map(([kind, label]) => `<div class="w-card" data-kind="${kind}">
+        <div class="w-head"><h3>${label} note</h3><span class="small" data-w-count></span>
+          <button class="btn small" data-w-reset type="button">Reset</button></div>
+        <textarea data-w-text spellcheck="true" aria-label="${label} note wording"></textarea>
+        <div class="w-chips"><span class="small">Insert:</span>${["{first}", "{product}", "{company}"].map(p => `<button class="btn small" data-w-insert="${p}" type="button">${p}</button>`).join("")}</div>
+        <div class="w-warn hidden" data-w-warn></div>
+        <div class="w-sample"><span class="small" data-w-sample-label></span><span data-w-sample></span>
+          <div class="note-foot"><span class="count" data-w-sample-count></span></div></div>
+      </div>`).join("")}</div>
+    </div>`;
+  }
+  function updateWordingPanel() {
+    if ($("#wording").classList.contains("hidden") || !DATA) return;
+    const all = noteEntries().map(([, e]) => e);
+    for (const card of document.querySelectorAll(".w-card")) {
+      const kind = card.dataset.kind;
+      const ta = card.querySelector("[data-w-text]");
+      if (document.activeElement !== ta) ta.value = wording[kind] ?? DATA.noteDefaults[kind];
+      const mine = all.filter(e => e.noteParts.kind === kind);
+      const over = mine.filter(e => e.noteLen > NOTE_MAX).length;
+      card.querySelector("[data-w-count]").textContent = `${mine.length} notes${over ? `, ${over} over ${NOTE_MAX}` : ""}`;
+      card.querySelector("[data-w-count]").classList.toggle("count", !!over);
+      card.querySelector("[data-w-count]").classList.toggle("over", !!over);
+      const warn = card.querySelector("[data-w-warn]");
+      const warnings = wordingWarnings(kind);
+      warn.textContent = warnings.join(" ");
+      warn.classList.toggle("hidden", !warnings.length);
+      const sample = mine[0];
+      card.querySelector("[data-w-sample-label]").textContent = sample ? `Example: ${sample.company}` : "No notes of this type yet";
+      card.querySelector("[data-w-sample]").textContent = sample ? sample.note : "";
+      const sc = card.querySelector("[data-w-sample-count]");
+      sc.textContent = sample ? `${sample.noteLen}/${NOTE_MAX}` : "";
+      sc.classList.toggle("over", !!sample && sample.noteLen > NOTE_MAX);
+    }
+  }
+  function wordingStatus(msg, bad) {
+    const el = $("#wStatus");
+    if (el) { el.textContent = msg; el.classList.toggle("bad", !!bad); }
+  }
+  async function saveWording() {
+    if (STATIC) {
+      store.set("jb.noteWording", wording);
+      wordingStatus("Saved in this browser. Other devices keep their own wording until the local board publishes.");
+      return;
+    }
+    try {
+      const r = await fetch("/api/note-wording", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Job-Board": "1" },
+        body: JSON.stringify(wording),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      wordingStatus("Saved. The hosted board picks this up the next time it publishes.");
+    } catch (err) {
+      wordingStatus(`Couldn't save your wording (${err.message}). It still applies until you reload this page.`, true);
+    }
+  }
+  let notesTimer, saveTimer;
+  function wordingChanged() {
+    wording.savedAt = Date.now();
+    wordingStatus("Saving…");
+    clearTimeout(notesTimer);
+    notesTimer = setTimeout(() => { refreshNotes(); updateNoteRows(); updateWordingPanel(); }, 80);
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveWording, 500);
+  }
+  function setWordingOpen(on) {
+    if (on && !$("#wording").firstChild) buildWordingPanel();
+    $("#wording").classList.toggle("hidden", !on);
+    $("#wordingBtn").setAttribute("aria-expanded", String(on));
+    if (on) updateWordingPanel();
+  }
+
   function render() {
     const main = $("#main");
     if (!DATA || !DATA.days.length) { main.innerHTML = `<div class="empty">No daily files found in startup-hunt/daily yet.</div>`; return; }
+    syncWording();
+    refreshNotes();
+    updateWordingPanel();
     updateSub();
     main.innerHTML = DATA.days.map(d => {
       const nApplied = d.entries.filter(e => e.trackerStatus === "applied").length;
@@ -620,6 +791,32 @@ mark.fill { background: var(--warn-soft); color: var(--warn); border-radius: 4px
       setStatus(e.key, e.company, cb.dataset.status, cb.checked);
     }
   });
+  $("#wordingBtn").addEventListener("click", () => { if (DATA) setWordingOpen($("#wording").classList.contains("hidden")); });
+  $("#wording").addEventListener("input", ev => {
+    const ta = ev.target.closest("[data-w-text]");
+    if (!ta) return;
+    const kind = ta.closest(".w-card").dataset.kind;
+    if (ta.value.trim() && ta.value !== DATA.noteDefaults[kind]) wording[kind] = ta.value;
+    else delete wording[kind];
+    wordingChanged();
+  });
+  $("#wording").addEventListener("click", ev => {
+    if (ev.target.closest("#wordingClose")) { setWordingOpen(false); return; }
+    const card = ev.target.closest(".w-card");
+    if (!card) return;
+    const ta = card.querySelector("[data-w-text]");
+    const insert = ev.target.closest("[data-w-insert]");
+    if (insert) {
+      ta.focus();
+      ta.setRangeText(insert.dataset.wInsert, ta.selectionStart, ta.selectionEnd, "end");
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
+    } else if (ev.target.closest("[data-w-reset]")) {
+      if (wording[card.dataset.kind] && !confirm("Replace this wording with the original?")) return;
+      ta.value = DATA.noteDefaults[card.dataset.kind];
+      ta.blur();
+      ta.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  });
   $("#q").addEventListener("input", applyFilter);
   $("#hideApplied").checked = store.get("jb.hideApplied", false);
   $("#hideApplied").addEventListener("change", () => { store.set("jb.hideApplied", $("#hideApplied").checked); applyFilter(); });
@@ -628,7 +825,7 @@ mark.fill { background: var(--warn-soft); color: var(--warn); border-radius: 4px
   $("#refresh").addEventListener("click", () => load(true));
   if (STATIC) {
     $("#lockBtn").classList.remove("hidden");
-    $("#lockBtn").addEventListener("click", () => { forgetPassword(); DATA = null; showLock(); });
+    $("#lockBtn").addEventListener("click", () => { forgetPassword(); DATA = null; setWordingOpen(false); showLock(); });
   }
   $("#collapseAll").addEventListener("click", () => {
     const secs = [...document.querySelectorAll(".day")];
